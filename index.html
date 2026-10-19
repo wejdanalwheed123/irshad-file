@@ -176,17 +176,21 @@
     #printAllContainer .print-section{padding:34px 30px; page-break-after:always;}
     #printAllContainer .print-section:last-child{page-break-after:auto;}
 
-    /* ---- Cover: fills exactly one full printed page, edge to edge ---- */
-    #printAllContainer .print-section:first-child{
+    /* ---- Cover: fills exactly one full printed page, edge to edge ----
+       (scoped to .cover-print-page specifically, NOT :first-child — a
+       single-section print like "طباعة الشهر" is also its container's only/first
+       child, and :first-child used to wrongly clip it to one page and hide
+       everything after the first table.) */
+    #printAllContainer .print-section.cover-print-page{
       padding:0 !important; margin:0 !important; width:21cm; height:29.7cm;
       max-height:29.7cm; overflow:hidden; page-break-after:always; page-break-inside:avoid;
       break-after:page; break-inside:avoid;
     }
-    #printAllContainer .print-section:first-child .cover-page{
+    #printAllContainer .print-section.cover-print-page .cover-page{
       border-radius:0; border:none; width:21cm; height:29.7cm; min-height:0; margin:0;
       overflow:hidden; display:flex;
     }
-    #printAllContainer .print-section:first-child .cover-bg{
+    #printAllContainer .print-section.cover-print-page .cover-bg{
       width:21cm; height:29.7cm; min-height:0; padding:3cm 2cm; box-sizing:border-box;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact;
     }
@@ -2310,7 +2314,8 @@ function printAllSections(){
     const html = renderer();
     const topbar = key==='cover' ? '' : printTopbar(label);
     const footer = key==='cover' ? '' : printFooterHtml();
-    return `<div class="print-section">${topbar}${html}${footer}</div>`;
+    const cls = key==='cover' ? 'print-section cover-print-page' : 'print-section';
+    return `<div class="${cls}">${topbar}${html}${footer}</div>`;
   }).join('');
   document.body.classList.add('printing-all');
   window.print();
