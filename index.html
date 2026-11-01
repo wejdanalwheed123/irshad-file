@@ -1357,8 +1357,31 @@ async function attachMonthFile(monthId, key, files){
   const f = files[0];
   const month = DATA.disciplineMonths.find(m=>m.id===monthId);
   month[key+'File'] = {data: await readFileAsDataURL(f), name: f.name};
+  let added = 0;
+  if(f.name.toLowerCase().endsWith('.json') || f.type==='application/json'){
+    try{
+      const text = await f.text();
+      const parsed = JSON.parse(text);
+      if(parsed && parsed.month && ['attendance-month-tally','late-month-tally'].includes(parsed.type)){
+        ['absence','late','disciplined'].forEach(k=>{
+          if(!Array.isArray(parsed[k])) return;
+          if(!Array.isArray(month[k])) month[k] = [];
+          const existingKeys = new Set(month[k].map(x=> tagName(x)+'|'+tagCls(x)));
+          parsed[k].forEach(item=>{
+            const ek = (item.name||'')+'|'+(item.cls||'');
+            if(!existingKeys.has(ek)){
+              month[k].push({name:item.name, cls:item.cls||''});
+              existingKeys.add(ek);
+              added++;
+            }
+          });
+        });
+      }
+    }catch(err){ /* not a tally JSON — keep it as a plain attachment */ }
+  }
   saveData();
   renderSection(currentSection);
+  if(added>0) alert('تم استيراد '+added+' اسم من الملف تلقائياً.');
 }
 function addDisciplineMonth(){
   const val = document.getElementById('newMonthLabel').value;
