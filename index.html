@@ -2417,11 +2417,12 @@ function restoreBlobs(remote, local){
   return remote;
 }
 function applyRemote(key, data){
-  if(data.t==='s'){ if(DATA[key]!==data.v){ DATA[key]=data.v; return true; } return false; }
+  const first=(syncedIds[key]===undefined);   // first time this device meets this section in the cloud: what is already on the device wins
+  if(data.t==='s'){ if(first && DATA[key]) return false; if(DATA[key]!==data.v){ DATA[key]=data.v; return true; } return false; }
   const remoteItems=data.items||{}, local=Array.isArray(DATA[key])?DATA[key]:[];
   const synced=new Set(syncedIds[key]||[]);
   const localById={}; local.forEach(it=>{ if(it&&it.id) localById[it.id]=it; });
-  const out=Object.keys(remoteItems).map(id=>restoreBlobs(Object.assign({},remoteItems[id]), localById[id]));
+  const out=Object.keys(remoteItems).map(id=> (first&&localById[id]) ? localById[id] : restoreBlobs(Object.assign({},remoteItems[id]), localById[id]));
   local.forEach(it=>{ if(it&&it.id&&!remoteItems[it.id]&&!synced.has(it.id)) out.push(it); }); // never reached the cloud yet → keep
   out.sort((a,b)=>(a._o||0)-(b._o||0));
   const before=stable(strip(local)), after=stable(strip(out));
@@ -2433,6 +2434,7 @@ function localIsEmpty(){
 async function bootSync(){
   try{
     firebase.initializeApp(FB); fdb=firebase.firestore();
+    try{ fdb.settings({experimentalAutoDetectLongPolling:true, merge:true}); }catch(e){}
     try{ await fdb.enablePersistence({synchronizeTabs:true}); }catch(e){}
   }catch(e){ fdb=null; setBadge(false); return; }
   fdb.collection(SYNC_COL).onSnapshot({includeMetadataChanges:true}, snap=>{
@@ -2444,7 +2446,7 @@ async function bootSync(){
       if(applyRemote(key,data)) changed=true;
       const items={}; if(data.t==='a') Object.keys(data.items||{}).forEach(id=>items[id]=stable(data.items[id]));
       lastSynced[key]={sig:docSig(data),items};
-      if(data.t==='a') syncedIds[key]=Object.keys(data.items||{});
+      syncedIds[key]=(data.t==='a')?Object.keys(data.items||{}):[];
     });
     const live=!snap.metadata.fromCache;
     setBadge(live);
@@ -2458,7 +2460,7 @@ async function bootSync(){
       try{ renderSection(currentSection); }catch(e){}
     }
     if(syncReady) pushChanges();   // uploads whatever exists only on this device (first time)
-  }, err=>{ setBadge(false, err&&err.code==='permission-denied'?'الحفظ المشترك مرفوض':'غير متصل — يُحفظ على الجهاز'); });
+  }, err=>{ setBadge(false, err&&err.code==='permission-denied'?'الحفظ المشترك مرفوض':'غير متصل ('+((err&&err.code)||'؟')+') — يُحفظ على الجهاز'); });
 }
 
 /* ---------------- Init ---------------- */
